@@ -4,18 +4,16 @@ using UnityEngine;
 
 public class Preview : MonoBehaviour
 {
-    public enum MarchingCubesVersion
-    {
-        OriginalMC,
-        NewMC
-    }
-
     [Header("Chunk Settings")]
     public bool enableChunkedMode;
     public Vector3 chunkOffset;
-    [Range(1, 64)]
+    [Range(1, 127)]
     public float chunkSize;
+    public float maxViewDistance;
+    public float viewerDeltaRequiredToUpdate;
+    public float[] lodMaxDistances;
     public GameObject viewer;
+    public TerrainChunkManager terrainChunkManager;
 
     [Header("Noise Settings")]
     public bool useNoise;
@@ -23,21 +21,19 @@ public class Preview : MonoBehaviour
     public NoiseMod noiseSettings;
     public bool showMinMax;
     public int extraIterations;
-    NoiseMap2D noiseMap2D;
-    NoiseMap3D noiseMap3D;
+    NoiseMap noiseMap;
 
-
-    /// <summary>Distance from center of mesh to the outside along a relevant axis.</summary>
     [Header("Mesh Settings")]
+    public PreviewMode previewMode;
     public bool useMesh;
     public Vector3 meshOffset;
-    [Range(1, 100)]
+    /// <summary>Diameter of sphere (without noise).</summary>
+    [Range(1, 1000)]
     public float diameter = 5;
     public bool useMarchingCubes;
-    public MarchingCubesVersion mcVersion;
     public PreviewMesh previewMesh;
 
-    /// <summary>Quantity of vertices per axis.</summary>
+    /// <summary>Number of vertices per axis.</summary>
     [Range(2,128)]
     public int vertexResolution = 1;
 
@@ -48,46 +44,31 @@ public class Preview : MonoBehaviour
     public int textureResolution;
     public bool matchMeshResolution;
 
+    public enum PreviewMode
+    {
+        Noise,
+        Sphere
+    }
+
     public void GeneratePreview()
     {
-        noiseMap2D = new NoiseMap2D(vertexResolution, diameter, useNoise ? noiseSettings : NoiseMod.flat);
-        noiseMap2D.Generate(noiseOffset);
+        noiseMap = new NoiseMap(vertexResolution, chunkSize, useNoise ? noiseSettings : NoiseMod.flat);
         if (useMesh)
         {
             GetMesh();
+            previewMesh.transform.position = chunkOffset;
         }
         previewMesh.meshRenderer.sharedMaterial = material;
         if (useNoise)
         {
             if (showMinMax)
             {
-                float minVal = float.MaxValue;
-                float maxVal = float.MinValue;
-                float avgMin = 0;
-                float avgMax = 0;
-                avgMin += noiseMap2D.minValue;
-                avgMax += noiseMap2D.maxValue;
-                if (noiseMap2D.minValue < minVal) minVal = noiseMap2D.minValue;
-                if (noiseMap2D.maxValue > maxVal) maxVal = noiseMap2D.maxValue;
-                for (int i = 0; i < extraIterations; i++)
-                {
-                    noiseMap2D.Generate(new Vector3(noiseOffset.x + i * diameter, noiseOffset.z));
-                    avgMin += noiseMap2D.minValue;
-                    avgMax += noiseMap2D.maxValue;
-                    if (noiseMap2D.minValue < minVal) minVal = noiseMap2D.minValue;
-                    if (noiseMap2D.maxValue > maxVal) maxVal = noiseMap2D.maxValue;
-                    noiseMap2D.Generate(new Vector3(noiseOffset.x, noiseOffset.z + i * diameter));
-                    if (noiseMap2D.minValue < minVal) minVal = noiseMap2D.minValue;
-                    if (noiseMap2D.maxValue > maxVal) maxVal = noiseMap2D.maxValue;
-                    avgMin += noiseMap2D.minValue;
-                    avgMax += noiseMap2D.maxValue;
-                }
-                Debug.LogFormat("Noise Values- Min: {0}, Max: {1}, Avg Min: {2}, Avg Max: {3}", minVal, maxVal, avgMin / (1 + extraIterations * 2), avgMax / (1 + extraIterations * 2));
+                ShowNoiseStatistics();
             }
             if (useTexture)
             {
                 material = Resources.Load<Material>("Materials/NoiseMap");
-                material.mainTexture = GetNoiseTexture(noiseMap2D.values);
+                material.mainTexture = GetNoiseTexture(noiseMap);
             }
         }
     }
@@ -100,42 +81,35 @@ public class Preview : MonoBehaviour
 
     void GetMesh()
     {
-        Vector2 size = new Vector2(diameter, diameter);
-        Vector2Int vertices = new Vector2Int(vertexResolution, vertexResolution);
         Mesh mesh = previewMesh.meshFilter.sharedMesh;
         mesh = mesh == null ? new Mesh() : mesh;
-        if (useNoise && useMarchingCubes)
+        ChunkMesh chunkMesh = new ChunkMesh(vertexResolution, chunkSize, ref mesh);
+        chunkMesh.SetNoise(noiseSettings, noiseOffset);
+        if (useMarchingCubes)
         {
-            DensityMap densityMap = new DensityMap(noiseMap2D);
-            mesh = ChunkMesh.DensityMesh(ref mesh, vertexResolution, densityMap);
-        }
-        else if (useMarchingCubes)
-        {
-            //System.Diagnostics.Stopwatch stopwatch = new System.Diagnostics.Stopwatch();
-            //stopwatch.Start();
-            switch (mcVersion)
+            noiseMap.SetOffset(noiseOffset);
+            switch (previewMode)
             {
-                case MarchingCubesVersion.OriginalMC:
-                    //mesh = ChunkMesh.OldMCMesh(ref mesh, diameter / 2, vertexResolution);
+                case PreviewMode.Noise:
+                    chunkMesh.GenerateNoiseMesh(noiseOffset, chunkOffset);
                     break;
-                case MarchingCubesVersion.NewMC:
-                    mesh = ChunkMesh.MyMCMesh(ref mesh, diameter / 2, vertexResolution, chunkSize, chunkOffset);
+                case PreviewMode.Sphere:
+                    chunkMesh.GenerateSphereMesh(diameter / 2, chunkOffset);
                     break;
                 default:
                     break;
             }
-            //stopwatch.Stop();
-            //Debug.LogFormat("{1} Marching Cubes ran in {0} secs.\n",
-            //(double)(stopwatch.ElapsedMilliseconds / 1000f), mcVersion.ToString());
         }
         else
         {
-            ChunkMesh.GetSquareMesh(ref mesh, vertices, size, meshOffset, noiseMap2D);
+            chunkMesh.SetNoise(useNoise ? noiseSettings : NoiseMod.flat, noiseOffset);
+            chunkMesh.useNoise = useNoise;
+            chunkMesh.GenerateSquareMesh(chunkOffset);
+            noiseMap = chunkMesh.noiseMap;
         }
-        
     }
 
-    Texture2D GetNoiseTexture(float [,] noiseMap) //move this?
+    Texture2D GetNoiseTexture(NoiseMap noiseMap) //move this?
     {
         Texture2D texture = (Texture2D)material.mainTexture;
         if (texture == null || texture.width != textureResolution)
@@ -147,14 +121,59 @@ public class Preview : MonoBehaviour
         {
             for (int x = 0; x < textureResolution; x++)
             {
-                texture.SetPixel(x, y, Color.Lerp(Color.black, Color.white, noiseMap[x, y]));
+                float t = Mathf.InverseLerp(noiseMap.minValue, noiseMap.maxValue, noiseMap.GetNoiseValue(x, y));
+                texture.SetPixel(x, y, Color.Lerp(Color.black, Color.white, t));
             }
         }
+        //texture.filterMode = FilterMode.Trilinear;
         texture.Apply();
         return texture;
     }
 
+    void ShowNoiseStatistics()
+    {
+        float minVal = float.MaxValue;
+        float maxVal = float.MinValue;
+        float avgMin = 0;
+        float avgMax = 0;
+        noiseMap.Generate();
+        avgMin += noiseMap.minValue;
+        avgMax += noiseMap.maxValue;
+        if (noiseMap.minValue < minVal) minVal = noiseMap.minValue;
+        if (noiseMap.maxValue > maxVal) maxVal = noiseMap.maxValue;
+        for (int i = 0; i < extraIterations; i++)
+        {
+            noiseMap.Generate(new Vector3(noiseOffset.x + i * diameter, noiseOffset.z));
+            avgMin += noiseMap.minValue;
+            avgMax += noiseMap.maxValue;
+            if (noiseMap.minValue < minVal) minVal = noiseMap.minValue;
+            if (noiseMap.maxValue > maxVal) maxVal = noiseMap.maxValue;
+            noiseMap.Generate(new Vector3(noiseOffset.x, noiseOffset.z + i * diameter));
+            if (noiseMap.minValue < minVal) minVal = noiseMap.minValue;
+            if (noiseMap.maxValue > maxVal) maxVal = noiseMap.maxValue;
+            avgMin += noiseMap.minValue;
+            avgMax += noiseMap.maxValue;
+        }
+        Debug.LogFormat("Noise Values: Min: {0}, Max: {1}, Avg Min: {2}, Avg Max: {3}", minVal, maxVal, avgMin / (1 + extraIterations * 2), avgMax / (1 + extraIterations * 2));
+        Debug.LogFormat("Noise Range: {0}", noiseMap.trueAmplitude);
+    }
 
+    System.Diagnostics.Stopwatch stopwatch = new System.Diagnostics.Stopwatch();
+    void TimerStart()
+    {
+        stopwatch.Start();
+    }
 
+    void TimerStop()
+    {
+        stopwatch.Stop();
+        Debug.LogFormat("Ran in {0} secs.\n",
+        (double)(stopwatch.ElapsedMilliseconds / 1000f));
+    }
 
+    void OnDrawGizmos()
+    {
+        Gizmos.color = Color.magenta;
+        Gizmos.DrawWireCube(chunkOffset + (Vector3.one * chunkSize) / 2, new Vector3(chunkSize, chunkSize, chunkSize));
+    }
 }
