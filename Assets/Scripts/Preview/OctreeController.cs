@@ -16,11 +16,11 @@ public class OctreeController : MonoBehaviour
 
     public Octree octree { get
         {
-            _octree = _octree ?? GetComponentInChildren<Octree>();
+            //_octree = _octree ?? GetComponentInChildren<Octree>();
             if (_octree == null)
             {
-                _octree = (new GameObject("Octree-D:1", typeof(Octree))).GetComponentInChildren<Octree>();
-                _octree.transform.parent = transform;
+                //_octree = (new GameObject("Octree-D:1", typeof(Octree))).GetComponentInChildren<Octree>();
+                //_octree.transform.parent = transform;
             }
             return _octree;
         }
@@ -39,22 +39,22 @@ public class OctreeController : MonoBehaviour
 
     public void Generate()
     {
-        if (octree.isInitialized)
-            octree.Refresh(offset, new Vector3(octreeSize, octreeSize, octreeSize), showWireframe, wireframeColor);
-        else
-            InitializeOctree();
+        //if (octree.isInitialized)
+        //    octree.Refresh(offset, new Vector3(octreeSize, octreeSize, octreeSize), showWireframe, wireframeColor);
+        //else
+        //    InitializeOctree();
     }
 
     public void UpdateDepth()
     {
-        if (!octree.isInitialized)
-            InitializeOctree();
-        if (octree.maxDepth != this.maxOctreeDepth)
-            octree.OnMaxDepthChanged(this.maxOctreeDepth);
+        //if (!octree.isInitialized)
+        //    InitializeOctree();
+        //if (octree.minVoxelSize != this.maxOctreeDepth)
+        //    octree.OnMaxDepthChanged(this.maxOctreeDepth);
     }
 
     void InitializeOctree()
     {
-        octree.Initialize(offset, new Vector3(octreeSize, octreeSize, octreeSize), 1, maxOctreeDepth, showWireframe, wireframeColor);
+        //octree.Initialize(offset, new Vector3(octreeSize, octreeSize, octreeSize), 1, maxOctreeDepth, showWireframe, wireframeColor);
     }
 }
