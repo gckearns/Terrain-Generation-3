@@ -47,7 +47,9 @@ public class Preview : MonoBehaviour
     public enum PreviewMode
     {
         Noise,
-        Sphere
+        TransvoxelNoise,
+        Sphere,
+        TransvoxelSphere
     }
 
     public void GeneratePreview()
@@ -71,6 +73,8 @@ public class Preview : MonoBehaviour
                 material.mainTexture = GetNoiseTexture(noiseMap);
             }
         }
+
+        Test();
     }
 
     void OnValidate()
@@ -92,6 +96,9 @@ public class Preview : MonoBehaviour
             {
                 case PreviewMode.Noise:
                     chunkMesh.GenerateNoiseMesh(noiseOffset, chunkOffset);
+                    break;
+                case PreviewMode.TransvoxelNoise:
+                    chunkMesh.GenerateNoiseTranxvoxelMesh(noiseOffset, chunkOffset);
                     break;
                 case PreviewMode.Sphere:
                     chunkMesh.GenerateSphereMesh(diameter / 2, chunkOffset);
@@ -175,5 +182,19 @@ public class Preview : MonoBehaviour
     {
         Gizmos.color = Color.magenta;
         Gizmos.DrawWireCube(chunkOffset + (Vector3.one * chunkSize) / 2, new Vector3(chunkSize, chunkSize, chunkSize));
+    }
+
+    void Test()
+    {
+        //noiseMap.Generate(noiseOffset);
+        ////Debug.LogFormat("noisemap resolution: {0}", noiseMap.numEdgeVertices);
+        //DensityMap densityMap = new DensityMap(noiseMap.numEdgeVertices);
+        //densityMap.SetMode3DNoise(noiseMap);
+        //densityMap.Generate();
+        ////Debug.LogFormat("densitymap resolution: {0}", densityMap.resolution.x);
+
+        //TransvoxelBlock tBlock = new TransvoxelBlock(noiseMap.numEdgeVertices, noiseMap.numEdgeVertices, noiseMap.numEdgeVertices);
+        //tBlock.SetVoxelValues(densityMap.values);
+        //tBlock.Generate(0f);
     }
 }

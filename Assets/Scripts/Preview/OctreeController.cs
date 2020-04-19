@@ -26,7 +26,7 @@ public class OctreeController : MonoBehaviour
         }
     }
 
-    private Octree _octree;
+    private Octree _octree = null;
 
     // on script loaded or inspector value changed. editor only
     void OnValidate()

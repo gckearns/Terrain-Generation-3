@@ -118,6 +118,24 @@ public class ChunkMesh
         GenerateDensityMesh(densityMap);
     }
 
+    public void GenerateNoiseTranxvoxelMesh(Vector3 noiseOffset, Vector3 chunkOffset)
+    {
+        _chunkOffset = chunkOffset;
+        _noiseOffset = noiseOffset;
+
+        _noiseMap = new NoiseMap(_verticesPerEdge, _edgeSize, NoiseMod.formation3D);
+        _noiseMap.SetNumDimensions(3);
+        _noiseMap.SetOffset(_noiseOffset + chunkOffset);
+        _noiseMap.Generate();
+
+        DensityMap densityMap = new DensityMap(_verticesPerEdge);
+        densityMap.SetMode3DNoise(_noiseMap);
+        densityMap.SetChunkInfo(_chunkOffset, _edgeSize);
+        densityMap.Generate();
+
+        GenerateTransvoxelMesh(densityMap);
+    }
+
     public void GenerateSphereMesh(float radius, Vector3 chunkOffset)
     {
         _chunkOffset = chunkOffset;
@@ -154,6 +172,19 @@ public class ChunkMesh
 
         mc.CleanTemps();
         mc.CleanAll();
+    }
+
+    public void GenerateTransvoxelMesh(DensityMap densityMap)
+    {
+        TransvoxelBlock transvoxelBlock = new TransvoxelBlock(densityMap.resolution.x, densityMap.resolution.y, densityMap.resolution.z);
+        transvoxelBlock.SetVoxelValues(densityMap.values);
+        transvoxelBlock.Generate(0f);
+
+        _mesh.Clear();
+        _mesh.name = "Transvoxel";
+        _mesh.vertices = GetMeshVertices(transvoxelBlock.vertices, transvoxelBlock.vertices.Length, densityMap.scale, Vector3.zero);
+        _mesh.triangles = transvoxelBlock.triangles;
+        _mesh.RecalculateNormals();
     }
 
     static Vector3[] GetMeshVertices(Vector3[] vertices, int numVerts, float scale, Vector3 offset)//need to add offsets later
